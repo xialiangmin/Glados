@@ -1,16 +1,18 @@
 const cookie = $persistentStore.read("glados_cookie");
 
 if (!cookie) {
+
   $notification.post(
-    "GLaDOS签到",
-    "失败",
-    "未获取到Cookie，请先手动签到一次"
+    "GLaDOS",
+    "未获取Cookie",
+    "请先手动签到一次"
   );
 
   $done();
 }
 
-const url = "https://glados.cloud/api/user/checkin";
+const checkinUrl = "https://glados.cloud/api/user/checkin";
+const statusUrl = "https://glados.cloud/api/user/status";
 
 const headers = {
   "cookie": cookie,
@@ -24,9 +26,22 @@ const body = JSON.stringify({
   token: "glados.one"
 });
 
+function formatTraffic(bytes) {
+
+  if (bytes < 1024) return bytes + " B";
+
+  if (bytes < 1024 * 1024)
+    return (bytes / 1024).toFixed(2) + " KB";
+
+  if (bytes < 1024 * 1024 * 1024)
+    return (bytes / 1024 / 1024).toFixed(2) + " MB";
+
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+}
+
 $httpClient.post(
   {
-    url,
+    url: checkinUrl,
     headers,
     body
   },
@@ -34,11 +49,9 @@ $httpClient.post(
 
     if (error) {
 
-      console.log(error);
-
       $notification.post(
-        "GLaDOS签到",
-        "请求失败",
+        "GLaDOS签到失败",
+        "请求错误",
         error
       );
 
@@ -46,27 +59,73 @@ $httpClient.post(
       return;
     }
 
-    console.log(data);
+    let checkinMsg = "签到完成";
 
     try {
 
-      const result = JSON.parse(data);
+      const obj = JSON.parse(data);
 
-      $notification.post(
-        "GLaDOS签到",
-        result.message || "签到完成",
-        data
-      );
+      checkinMsg = obj.message || "签到成功";
 
-    } catch(e) {
+    } catch(e) {}
 
-      $notification.post(
-        "GLaDOS签到",
-        "解析失败",
-        data
-      );
-    }
+    // 查询账户状态
+    $httpClient.get(
+      {
+        url: statusUrl,
+        headers
+      },
+      function(err, resp, result) {
 
-    $done();
+        if (err) {
+
+          $notification.post(
+            "GLaDOS",
+            checkinMsg,
+            "用户信息获取失败"
+          );
+
+          $done();
+          return;
+        }
+
+        try {
+
+          const info = JSON.parse(result);
+
+          const leftDays = info.data.leftDays || "未知";
+
+          const traffic = formatTraffic(
+            info.data.traffic || 0
+          );
+
+          const vip = info.data.vip || 0;
+
+          const vipText = vip ? "VIP用户" : "普通用户";
+
+          const message =
+            `${checkinMsg}\n` +
+            `剩余天数: ${leftDays}\n` +
+            `剩余流量: ${traffic}\n` +
+            `账户类型: ${vipText}`;
+
+          $notification.post(
+            "GLaDOS",
+            "签到成功",
+            message
+          );
+
+        } catch(e) {
+
+          $notification.post(
+            "GLaDOS",
+            checkinMsg,
+            "状态解析失败"
+          );
+        }
+
+        $done();
+      }
+    );
   }
 );
