@@ -1,5 +1,6 @@
 #!name=GLaDOS Auto Checkin
 #!desc=自动获取Cookie并每日签到
+#!icon=https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Proxy.png
 
 [Script]
 
