@@ -1,7 +1,5 @@
 #!name=GLaDOS Auto Checkin
 #!desc=自动获取Cookie并每日签到
-#!author=ChatGPT
-#!system=ios
 
 [Script]
 
