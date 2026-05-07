@@ -1,3 +1,61 @@
+const today = new Date().toLocaleDateString();
+
+const signedKey = "glados_random_sign_date";
+const randomKey = "glados_random_minute";
+
+// 今天已经签到过
+if ($persistentStore.read(signedKey) === today) {
+  console.log("今日已签到");
+  $done();
+}
+
+// 获取当前时间
+const now = new Date();
+
+const currentHour = now.getHours();
+const currentMinute = now.getMinutes();
+
+// 第一次运行时生成随机时间
+let randomMinute = $persistentStore.read(randomKey);
+
+if (!randomMinute) {
+
+  // 7:00 ~ 11:59
+  const totalMinutes = Math.floor(Math.random() * 300);
+
+  randomMinute = totalMinutes.toString();
+
+  $persistentStore.write(
+    randomMinute,
+    randomKey
+  );
+}
+
+randomMinute = parseInt(randomMinute);
+
+const targetHour =
+  7 + Math.floor(randomMinute / 60);
+
+const targetMinute =
+  randomMinute % 60;
+
+console.log(
+  `随机签到时间: ${targetHour}:${targetMinute}`
+);
+
+// 当前时间未达到
+if (
+  currentHour < targetHour ||
+  (
+    currentHour === targetHour &&
+    currentMinute < targetMinute
+  )
+) {
+
+  console.log("未到签到时间");
+
+  $done();
+}
 const cookie = $persistentStore.read("glados_cookie");
 
 if (!cookie) {
@@ -114,6 +172,16 @@ $httpClient.post(
             "签到成功",
             message
           );
+          $persistentStore.write(
+  today,
+  signedKey
+);
+
+// 清空随机时间
+$persistentStore.write(
+  "",
+  randomKey
+);
 
         } catch(e) {
 
