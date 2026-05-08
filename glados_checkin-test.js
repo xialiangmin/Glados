@@ -15,58 +15,54 @@ function bytesToGB(b) {
     return (b / 1024 / 1024 / 1024).toFixed(2);
 }
 
-// 第一步：获取用户信息
-$task.fetch({
+// 获取用户信息
+$httpClient.get({
     url: "https://glados.cloud/api/user",
-    method: "GET",
     headers: headers
-}).then(function(res1) {
-    var user = JSON.parse(res1.body);
-    if (user.code !== 0) {
-        console.log("❌ 获取用户信息失败");
+}, function(error, response, data) {
+    if (error) {
+        console.log("❌ 获取信息失败");
         $done();
         return;
     }
 
-    var data = user.data;
-    var plan = data.plan;
-    var expire_at = data.expire_at;
-    var traffic_used = data.traffic_used;
-    var traffic_total = data.traffic_total;
-    var now = Date.now() / 1000;
-    var leftDays = Math.ceil((expire_at - now) / 86400);
-    var leftTraffic = bytesToGB(traffic_total - traffic_used);
+    var user = JSON.parse(data);
+    if (user.code !== 0) {
+        console.log("❌ 用户信息错误");
+        $done();
+        return;
+    }
+
+    var d = user.data;
+    var leftDays = Math.ceil((d.expire_at - Date.now() / 1000) / 86400);
 
     console.log("");
-    console.log("📌 GLaDOS 账号信息");
-    console.log("🔹 套餐类型: " + plan);
-    console.log("🔹 到期时间: " + new Date(expire_at * 1000).toLocaleString());
-    console.log("🔹 剩余天数: " + leftDays + " 天");
-    console.log("🔹 已用流量: " + bytesToGB(traffic_used) + " GB");
-    console.log("🔹 总流量: " + bytesToGB(traffic_total) + " GB");
-    console.log("🔹 剩余流量: " + leftTraffic + " GB");
+    console.log("📌 GLaDOS.cloud 账号信息");
+    console.log("🔹 套餐: " + d.plan);
+    console.log("🔹 到期: " + new Date(d.expire_at * 1000).toLocaleString());
+    console.log("🔹 剩余: " + leftDays + " 天");
+    console.log("🔹 已用流量: " + bytesToGB(d.traffic_used) + " GB");
+    console.log("🔹 总流量: " + bytesToGB(d.traffic_total) + " GB");
+    console.log("🔹 剩余流量: " + bytesToGB(d.traffic_total - d.traffic_used) + " GB");
     console.log("");
 
-    // 第二步：执行签到
-    $task.fetch({
+    // 执行签到
+    $httpClient.post({
         url: "https://glados.cloud/api/user/checkin",
-        method: "POST",
         headers: headers,
         body: "{}"
-    }).then(function(res2) {
-        var ck = JSON.parse(res2.body);
-        if (ck.code === 0) {
-            console.log("✅ 签到成功：" + ck.message);
+    }, function(err, resp, body) {
+        if (err) {
+            console.log("❌ 签到失败");
+            $done();
+            return;
+        }
+        var res = JSON.parse(body);
+        if (res.code === 0) {
+            console.log("✅ 签到成功：" + res.message);
         } else {
-            console.log("ℹ️ 签到结果：" + ck.message);
+            console.log("ℹ️ 签到结果：" + res.message);
         }
         $done();
-    }, function(err) {
-        console.log("❌ 签到请求失败");
-        $done();
     });
-
-}, function(err) {
-    console.log("❌ 获取用户信息失败");
-    $done();
 });
