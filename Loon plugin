@@ -8,7 +8,7 @@
 http-request ^https:\/\/glados\.cloud\/api\/user\/checkin script-path=https://raw.githubusercontent.com/xialiangmin/Glados/refs/heads/main/glados_cookie.js, requires-body=true, timeout=60, tag=GLaDOS获取Cookie
 
 # 2. 每日7-11点随机签到
-cron "0 9 * * *" script-path=https://raw.githubusercontent.com/xialiangmin/Glados/refs/heads/main/glados_checkin-test.js, timeout=60, tag=GLaDOS自动签到
+cron "0 9 * * *" script-path=https://raw.githubusercontent.com/xialiangmin/Glados/refs/heads/main/glados_checkin.js, timeout=60, tag=GLaDOS自动签到
 
 
 [MITM]
