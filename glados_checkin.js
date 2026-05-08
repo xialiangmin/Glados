@@ -9,8 +9,8 @@ if (!cookie) {
     $done();
 }
 
-const checkinUrl = "https://glados.space/api/user/checkin";
-const statusUrl = "https://glados.space/api/user/status";
+const checkinUrl = "https://glados.cloud/api/user/checkin";
+const statusUrl = "https://glados.cloud/api/user/status";
 
 const header = {
     "Cookie": cookie,
