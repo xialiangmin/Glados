@@ -1,7 +1,7 @@
 const cookie = $persistentStore.read("GLaDOS_Cookie");
 
 if (!cookie) {
-    console.log("❌ 未获取到Cookie，请先浏览器登录 glados.space");
+    console.log("❌ 未获取到Cookie，请先浏览器登录 glados.cloud");
     $done();
 }
 
@@ -17,7 +17,7 @@ function bytesToGB(b) {
 
 // 第一步：获取用户信息
 $task.fetch({
-    url: "https://glados.space/api/user",
+    url: "https://glados.cloud/api/user",
     method: "GET",
     headers: headers
 }).then(function(res1) {
@@ -49,7 +49,7 @@ $task.fetch({
 
     // 第二步：执行签到
     $task.fetch({
-        url: "https://glados.space/api/user/checkin",
+        url: "https://glados.cloud/api/user/checkin",
         method: "POST",
         headers: headers,
         body: "{}"
