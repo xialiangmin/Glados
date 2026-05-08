@@ -1,199 +1,71 @@
-const today = new Date().toLocaleDateString();
+// glados_checkin.js
+// 支持随机延迟签到版
 
-const signedKey = "glados_random_sign_date";
-const randomKey = "glados_random_minute";
-
-// 今天已经签到过
-if ($persistentStore.read(signedKey) === today) {
-  console.log("今日已签到");
-  $done();
-}
-
-// 获取当前时间
-const now = new Date();
-
-const currentHour = now.getHours();
-const currentMinute = now.getMinutes();
-
-// 第一次运行时生成随机时间
-let randomMinute = $persistentStore.read(randomKey);
-
-if (!randomMinute) {
-
-  // 7:00 ~ 11:59
-  const totalMinutes = Math.floor(Math.random() * 300);
-
-  randomMinute = totalMinutes.toString();
-
-  $persistentStore.write(
-    randomMinute,
-    randomKey
-  );
-}
-
-randomMinute = parseInt(randomMinute);
-
-const targetHour =
-  7 + Math.floor(randomMinute / 60);
-
-const targetMinute =
-  randomMinute % 60;
-
-console.log(
-  `随机签到时间: ${targetHour}:${targetMinute}`
-);
-
-// 当前时间未达到
-if (
-  currentHour < targetHour ||
-  (
-    currentHour === targetHour &&
-    currentMinute < targetMinute
-  )
-) {
-
-  console.log("未到签到时间");
-
-  $done();
-}
-const cookie = $persistentStore.read("glados_cookie");
+const maxDelay = 30 * 60; // 最大延迟时间，单位为秒 (30分钟)
+let cookie = $persistentStore.read("glados_cookie");
 
 if (!cookie) {
-
-  $notification.post(
-    "GLaDOS",
-    "未获取Cookie",
-    "请先手动签到一次"
-  );
-
-  $done();
+    $notification.post("GLaDOS 签到", "❌ 签到失败", "未找到 Cookie，请重新登录网页获取。");
+    $done();
 }
 
-const checkinUrl = "https://glados.cloud/api/user/checkin";
-const statusUrl = "https://glados.cloud/api/user/status";
+const checkinUrl = "https://glados.space/api/user/checkin";
+const statusUrl = "https://glados.space/api/user/status";
 
-const headers = {
-  "cookie": cookie,
-  "content-type": "application/json;charset=UTF-8",
-  "referer": "https://glados.cloud/console/checkin",
-  "origin": "https://glados.cloud",
-  "user-agent": "Mozilla/5.0"
+const header = {
+    "Cookie": cookie,
+    "Content-Type": "application/json;charset=utf-8",
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 };
 
-const body = JSON.stringify({
-  token: "glados.one"
-});
+// 随机延迟逻辑
+const delay = Math.floor(Math.random() * maxDelay);
+console.log(`[GLaDOS] 将在 ${delay} 秒后开始签到...`);
 
-function formatTraffic(bytes) {
+// 使用 setTimeout 实现延迟执行
+setTimeout(async () => {
+    try {
+        // 1. 执行签到请求
+        let checkinRes = await post(checkinUrl, JSON.stringify({ token: "glados.one" }));
+        let checkinObj = JSON.parse(checkinRes);
+        
+        // 2. 获取会员状态
+        let statusRes = await get(statusUrl);
+        let statusObj = JSON.parse(statusRes);
 
-  if (bytes < 1024) return bytes + " B";
+        if (statusObj.code === 0) {
+            const info = statusObj.data;
+            const days = info.leftDays !== undefined ? Math.floor(parseFloat(info.leftDays)) : "未知";
 
-  if (bytes < 1024 * 1024)
-    return (bytes / 1024).toFixed(2) + " KB";
+            let title = "";
+            if (checkinObj.code === 0) title = "✅ 签到成功";
+            else if (checkinObj.code === 1) title = "⚠️ 今日已签到";
+            else title = "❓ 签到状态异常";
 
-  if (bytes < 1024 * 1024 * 1024)
-    return (bytes / 1024 / 1024).toFixed(2) + " MB";
+            $notification.post("GLaDOS", title, `会员剩余：${days} 天 (随机延迟 ${Math.floor(delay/60)}分${delay%60}秒)`);
+        } else {
+            $notification.post("GLaDOS", "❌ 状态获取失败", statusObj.message);
+        }
+    } catch (err) {
+        $notification.post("GLaDOS 签到", "❌ 运行出错", "请检查网络或 Cookie");
+    } finally {
+        $done();
+    }
+}, delay * 1000);
 
-  return (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+// 请求封装
+function post(url, body) {
+    return new Promise((resolve, reject) => {
+        $httpClient.post({ url, headers: header, body }, (err, resp, data) => {
+            if (err) reject(err); else resolve(data);
+        });
+    });
 }
 
-$httpClient.post(
-  {
-    url: checkinUrl,
-    headers,
-    body
-  },
-  function(error, response, data) {
-
-    if (error) {
-
-      $notification.post(
-        "GLaDOS签到失败",
-        "请求错误",
-        error
-      );
-
-      $done();
-      return;
-    }
-
-    let checkinMsg = "签到完成";
-
-    try {
-
-      const obj = JSON.parse(data);
-
-      checkinMsg = obj.message || "签到成功";
-
-    } catch(e) {}
-
-    // 查询账户状态
-    $httpClient.get(
-      {
-        url: statusUrl,
-        headers
-      },
-      function(err, resp, result) {
-
-        if (err) {
-
-          $notification.post(
-            "GLaDOS",
-            checkinMsg,
-            "用户信息获取失败"
-          );
-
-          $done();
-          return;
-        }
-
-        try {
-
-          const info = JSON.parse(result);
-
-          const leftDays = info.data.leftDays || "未知";
-
-          const traffic = formatTraffic(
-            info.data.traffic || 0
-          );
-
-          const vip = info.data.vip || 0;
-
-          const vipText = vip ? "VIP用户" : "普通用户";
-
-          const message =
-            `${checkinMsg}\n` +
-            `剩余天数: ${leftDays}\n` +
-            `剩余流量: ${traffic}\n` +
-            `账户类型: ${vipText}`;
-
-          $notification.post(
-            "GLaDOS",
-            "签到成功",
-            message
-          );
-          $persistentStore.write(
-  today,
-  signedKey
-);
-
-// 清空随机时间
-$persistentStore.write(
-  "",
-  randomKey
-);
-
-        } catch(e) {
-
-          $notification.post(
-            "GLaDOS",
-            checkinMsg,
-            "状态解析失败"
-          );
-        }
-
-        $done();
-      }
-    );
-  }
-);
+function get(url) {
+    return new Promise((resolve, reject) => {
+        $httpClient.get({ url, headers: header }, (err, resp, data) => {
+            if (err) reject(err); else resolve(data);
+        });
+    });
+}
