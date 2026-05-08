@@ -1,7 +1,7 @@
-// GLaDOS Loon 签到 + 会员时长 + 流量查询
 const cookie = $persistentStore.read("GLaDOS_Cookie");
+
 if (!cookie) {
-    console.log("❌ 无Cookie，请先浏览器登录 glados.space");
+    console.log("❌ 未获取到Cookie，请先浏览器登录 glados.space");
     $done();
 }
 
@@ -11,76 +11,62 @@ const headers = {
     "Content-Type": "application/json"
 };
 
-// 工具：字节转 GB
-const bytesToGB = b => (b / 1024 / 1024 / 1024).toFixed(2);
+function bytesToGB(b) {
+    return (b / 1024 / 1024 / 1024).toFixed(2);
+}
 
-// 1. 获取用户信息（时长+流量）
-$task.fetch({ url: "https://glados.space/api/user", method: "GET", headers })
-.then(res1 => {
-    const user = JSON.parse(res1.body);
-    if (user.code !== 0) throw new Error("用户信息获取失败");
+// 第一步：获取用户信息
+$task.fetch({
+    url: "https://glados.space/api/user",
+    method: "GET",
+    headers: headers
+}).then(function(res1) {
+    var user = JSON.parse(res1.body);
+    if (user.code !== 0) {
+        console.log("❌ 获取用户信息失败");
+        $done();
+        return;
+    }
 
-    const { plan, expire_at, traffic_used, traffic_total } = user.data;
-    const now = Date.now() / 1000;
-    const leftDays = Math.ceil((expire_at - now) / 86400);
+    var data = user.data;
+    var plan = data.plan;
+    var expire_at = data.expire_at;
+    var traffic_used = data.traffic_used;
+    var traffic_total = data.traffic_total;
+    var now = Date.now() / 1000;
+    var leftDays = Math.ceil((expire_at - now) / 86400);
+    var leftTraffic = bytesToGB(traffic_total - traffic_used);
 
-    console.log(`\n📌 GLaDOS 账号信息`);
-    console.log(`🔹 套餐: ${plan}`);
-    console.log(`🔹 到期: ${new Date(expire_at * 1000).toLocaleString()}`);
-    console.log(`🔹 剩余: ${leftDays} 天`);
-    console.log(`🔹 已用流量: ${bytesToGB(traffic_used)} GB`);
-    console.log(`🔹 总流量: ${bytesToGB(traffic_total)} GB`);
-    console.log(`🔹 剩余流量: ${bytesToGB(traffic_total - traffic_used)} GB\n`);
+    console.log("");
+    console.log("📌 GLaDOS 账号信息");
+    console.log("🔹 套餐类型: " + plan);
+    console.log("🔹 到期时间: " + new Date(expire_at * 1000).toLocaleString());
+    console.log("🔹 剩余天数: " + leftDays + " 天");
+    console.log("🔹 已用流量: " + bytesToGB(traffic_used) + " GB");
+    console.log("🔹 总流量: " + bytesToGB(traffic_total) + " GB");
+    console.log("🔹 剩余流量: " + leftTraffic + " GB");
+    console.log("");
 
-    // 2. 执行签到
-    return $task.fetch({
+    // 第二步：执行签到
+    $task.fetch({
         url: "https://glados.space/api/user/checkin",
         method: "POST",
-        headers,
+        headers: headers,
         body: "{}"
-    });
-})
-.then(res2 => {
-    const ck = JSON.parse(res2.body);
-    if (ck.code === 0) {
-        console.log(`✅ 签到成功: ${ck.message}`);
-    } else {
-        console.log(`ℹ️ 签到提示: ${ck.message}`);
-    }
-})
-.catch(err => {
-    console.log(`❌ 失败: ${err.message || err}`);
-});            if (checkinObj.code === 0) title = "✅ 签到成功";
-            else if (checkinObj.code === 1) title = "⚠️ 今日已签到";
-            else title = "❓ 签到状态异常";
-
-            // 弹出通知
-            $notification.post("GLaDOS", title, `会员剩余：${days} 天`);
+    }).then(function(res2) {
+        var ck = JSON.parse(res2.body);
+        if (ck.code === 0) {
+            console.log("✅ 签到成功：" + ck.message);
         } else {
-            $notification.post("GLaDOS", "❌ 状态获取失败", statusObj.message);
+            console.log("ℹ️ 签到结果：" + ck.message);
         }
-    } catch (err) {
-        $notification.post("GLaDOS 签到", "❌ 运行出错", "请检查网络或 Cookie");
-    } finally {
         $done();
-    }
-}
-
-// 请求封装
-function post(url, body) {
-    return new Promise((resolve, reject) => {
-        $httpClient.post({ url, headers: header, body }, (err, resp, data) => {
-            if (err) reject(err); else resolve(data);
-        });
+    }, function(err) {
+        console.log("❌ 签到请求失败");
+        $done();
     });
-}
 
-function get(url) {
-    return new Promise((resolve, reject) => {
-        $httpClient.get({ url, headers: header }, (err, resp, data) => {
-            if (err) reject(err); else resolve(data);
-        });
-    });
-}
-
-start();
+}, function(err) {
+    console.log("❌ 获取用户信息失败");
+    $done();
+});
