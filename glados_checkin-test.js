@@ -1,4 +1,4 @@
-const cookie = $persistentStore.read("GLaDOS_Cookie");
+const cookie = $persistentStore.read("glados_cookie");
 
 if (!cookie) {
     console.log("❌ 未获取到Cookie，请先浏览器登录 glados.cloud");
