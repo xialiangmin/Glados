@@ -1,8 +1,10 @@
 // glados_checkin.js
+// 仅保留签到状态和会员天数显示
+
 let cookie = $persistentStore.read("glados_cookie");
 
 if (!cookie) {
-    $notification.post("GLaDOS 签到", "❌ 签到失败", "未找到 Cookie，请重新登录网页。");
+    $notification.post("GLaDOS 签到", "❌ 签到失败", "未找到 Cookie，请重新登录网页获取。");
     $done();
 }
 
@@ -17,51 +19,38 @@ const header = {
 
 async function start() {
     try {
-        // 1. 签到
+        // 1. 执行签到请求
         let checkinRes = await post(checkinUrl, JSON.stringify({ token: "glados.one" }));
         let checkinObj = JSON.parse(checkinRes);
         
-        // 2. 获取状态
+        // 2. 获取会员状态（天数）
         let statusRes = await get(statusUrl);
         let statusObj = JSON.parse(statusRes);
 
         if (statusObj.code === 0) {
             const info = statusObj.data;
-            
-            // --- 天数处理 ---
+            // 处理天数：parseFloat 转数字 -> Math.floor 取整
             const days = info.leftDays !== undefined ? Math.floor(parseFloat(info.leftDays)) : "未知";
 
-            // --- 流量处理 (多字段兼容逻辑) ---
-            // 尝试获取“总流量”
-            let totalByte = info.usage_limit || info.traffic_limit || info.limit || 0;
-            // 尝试获取“已用流量”
-            let usedByte = info.usage || info.traffic_used || info.used || 0;
-            
-            let trafficDetail = "";
+            // 根据签到返回的 code 判断标题
+            let title = "";
+            if (checkinObj.code === 0) title = "✅ 签到成功";
+            else if (checkinObj.code === 1) title = "⚠️ 今日已签到";
+            else title = "❓ 签到状态异常";
 
-            if (totalByte > 0) {
-                const totalGB = (totalByte / (1024 * 1024 * 1024)).toFixed(2);
-                const usedGB = (usedByte / (1024 * 1024 * 1024)).toFixed(2);
-                const remainingGB = (totalGB - usedGB).toFixed(2);
-                trafficDetail = `剩余流量：${remainingGB} GB (总 ${totalGB} GB)`;
-            } else {
-                // 如果依然获取不到，打印出 Data 里的所有键名，方便排查
-                trafficDetail = "流量字段未知: " + Object.keys(info).join(", ");
-            }
-
-            let title = checkinObj.code === 0 ? "✅ 签到成功" : (checkinObj.code === 1 ? "⚠️ 今日已签到" : "❓ 状态异常");
-            $notification.post("GLaDOS", title, `会员剩余：${days} 天\n${trafficDetail}`);
+            // 弹出通知
+            $notification.post("GLaDOS", title, `会员剩余：${days} 天`);
         } else {
             $notification.post("GLaDOS", "❌ 状态获取失败", statusObj.message);
         }
     } catch (err) {
-        $notification.post("GLaDOS 签到", "❌ 运行出错", err.toString());
+        $notification.post("GLaDOS 签到", "❌ 运行出错", "请检查网络或 Cookie");
     } finally {
         $done();
     }
 }
 
-// 简单的请求封装
+// 请求封装
 function post(url, body) {
     return new Promise((resolve, reject) => {
         $httpClient.post({ url, headers: header, body }, (err, resp, data) => {
